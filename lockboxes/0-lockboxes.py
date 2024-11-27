@@ -2,11 +2,11 @@
 ''' lockboxes python script '''
 
 
-def keys_collected(T, R):
-    res = []
-    for e in R:
-        res += T[e]
-    return res
+def keys_collected(boxes, unlocked_boxes):
+    keys = []
+    for box in unlocked_boxes:
+        keys += boxes[box]
+    return keys
 
 
 def canUnlockAll(boxes):
@@ -16,9 +16,9 @@ def canUnlockAll(boxes):
     while can_unlock_box:
         can_unlock_box = False
 
-        for j in keys_collected(boxes, list(unlocked)):
-            if j < len(boxes) and j not in unlocked:
-                unlocked.add(j)
+        for key in keys_collected(boxes, list(unlocked)):
+            if key < len(boxes) and key not in unlocked:
+                unlocked.add(key)
                 can_unlock_box = True
 
     locked_boxes_count = len(boxes) - len(unlocked)

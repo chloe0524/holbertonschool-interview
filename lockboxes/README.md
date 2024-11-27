@@ -1,7 +1,6 @@
 ## Lockboxes
 
-![White Minimalist Profile LinkedIn Banner (1)](https://github.com/user-attachments/assets/66d0a095-1e6f-43cf-ae6b-0516c1821d1f)
-
+![White Minimalist Profile LinkedIn Banner (1)](https://github.com/user-attachments/assets/091d5599-44f0-48a2-8d3b-a5b0f6e395d2)
 
 You have n number of locked boxes in front of you. Each box is numbered sequentially from 0 to n - 1 and each box may contain keys to the other boxes.
 

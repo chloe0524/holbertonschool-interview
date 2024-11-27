@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 ''' lockboxes python script '''
+
+
 def keys_collected(T, R):
     res = []
     for e in R:
@@ -22,6 +24,6 @@ def canUnlockAll(boxes):
     locked_boxes_count = len(boxes) - len(unlocked)
 
     if locked_boxes_count == 0:
-        return True 
+        return True
     else:
         return False

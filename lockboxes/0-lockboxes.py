@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+''' lockboxes python script '''
 def keys_collected(T, R):
     res = []
     for e in R:

@@ -3,6 +3,7 @@
 
 
 def island_perimeter(grid):
+    ''' Returns the perimeter of the island '''
     if not grid or not isinstance(grid, list):
         raise ValueError("Grid must be a list of lists")
     if not all(isinstance(row, list) for row in grid):

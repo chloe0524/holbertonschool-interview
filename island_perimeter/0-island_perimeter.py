@@ -7,15 +7,15 @@ def island_perimeter(grid):
         raise ValueError("Grid must be a list of lists")
     if not all(isinstance(row, list) for row in grid):
         raise ValueError("Grid must be a list of lists")
-    
+
     rows = len(grid)
     if rows == 0:
         return 0
-    
+
     cols = len(grid[0])
     if not all(len(row) == cols for row in grid):
         raise ValueError("Rows must have the same number of columns")
-    
+
     perimeter = 0
 
     for r in range(rows):

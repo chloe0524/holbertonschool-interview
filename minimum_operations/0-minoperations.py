@@ -1,16 +1,17 @@
 #!/usr/bin/python
-'''method that calculates the fewest number of operations needed to result in exactly n H characters in the file '''
+'''method that calculates the fewest number of operations needed'''
+
 
 def minOperations(n):
     ''' method '''
     if n <= 1:
         return 0
-    operations = 0
-    divisor = 2
+    operation = 0
+    div = 2
     while n > 1:
-        if n % divisor == 0:
-            operations += divisor
-            n //= divisor
+        if n % div == 0:
+            operation += div
+            n = int(n / div)
         else:
-            divisor += 1
-    return operations
+            div += 1
+    return operation

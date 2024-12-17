@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 '''method that calculates the fewest number of operations needed'''
 
 

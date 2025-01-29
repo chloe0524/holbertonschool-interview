@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """ ret Integer indicating total amount of rainwater retained. """
 
 

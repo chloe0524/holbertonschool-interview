@@ -4,22 +4,22 @@
 
 def validUTF8(data):
     """Determines if a data set represents a valid UTF-8 encoding."""
-    num_bs = 0
-    for b in data:
-        b = b & 0xFF
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list of integers")
+    if not all(isinstance(num, int) for num in data):
+        raise ValueError("All input elements in the list must be integers")
 
-        if num_bs == 0:
-            if (b >> 5) == 0b110:
-                num_bs = 1
-            elif (b >> 7):
+    rem = 0
+    for idx, num in enumerate(data):
+        byte = num & 0xFF
+        if rem:
+            if byte >> 6 != 2:
                 return False
-            elif (b >> 4) == 0b1110:
-                num_bs = 2
-            elif (b >> 3) == 0b11110:
-                num_bs = 3
-        else:
-            if (b >> 6) != 0b10:
-                return False
-            num_bs -= 1
-
-    return num_bs == 0
+            rem -= 1
+            continue
+        while (1 << abs(7 - rem)) & byte:
+            rem += 1
+        if rem == 1 or rem > 4:
+            return False
+        rem = max(rem - 1, 0)
+    return True if rem == 0 else False

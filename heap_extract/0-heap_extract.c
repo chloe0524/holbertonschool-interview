@@ -1,9 +1,4 @@
 #include "binary_trees.h"
-#include <stdlib.h>
-
-/* Function Prototypes */
-heap_t *get_last_node(heap_t *root);
-void heapify_down(heap_t *tree);
 
 /**
  * heap_extract - extracts the top value of binary heap
@@ -28,7 +23,7 @@ int heap_extract(heap_t **root)
 	/* Swap last node value with root */
 	(*root)->n = last_node->n;
 
-	/* Remove last node from tree */
+	/* Update parent pointer */
 	parent = last_node->parent;
 	if (parent)
 	{
@@ -39,9 +34,13 @@ int heap_extract(heap_t **root)
 	}
 
 	free(last_node);
+	last_node = NULL;  /* Avoid dangling pointer */
 
-	/* Heapify down */
-	heapify_down(*root);
+	/* If root was the only node, set root to NULL */
+	if (*root == last_node)
+		*root = NULL;
+	else
+		heapify_down(*root);
 
 	return (max);
 }
@@ -56,25 +55,28 @@ heap_t *get_last_node(heap_t *root)
 	if (!root)
 		return (NULL);
 
-	/* Use dynamically allocated queue */
 	heap_t **queue = malloc(1024 * sizeof(heap_t *));
+
 	if (!queue)
 		return (NULL);
 
 	int front = 0, rear = 0;
+
 	queue[rear++] = root;
+
+	heap_t *last = NULL;
 
 	while (front < rear)
 	{
-		root = queue[front++];
-		if (root->left)
-			queue[rear++] = root->left;
-		if (root->right)
-			queue[rear++] = root->right;
+		last = queue[front++];
+		if (last->left)
+			queue[rear++] = last->left;
+		if (last->right)
+			queue[rear++] = last->right;
 	}
 
 	free(queue);
-	return (root);
+	return (last);
 }
 
 /**

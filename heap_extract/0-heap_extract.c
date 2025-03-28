@@ -1,6 +1,8 @@
 #include "binary_trees.h"
 
-void remove_top(heap_t *);
+/* Helper functions */
+heap_t *get_last_node(heap_t *root);
+void heapify_down(heap_t *tree);
 
 /**
  * heap_extract - extracts the top value of binary heap
@@ -10,51 +12,100 @@ void remove_top(heap_t *);
 int heap_extract(heap_t **root)
 {
 	int max;
+	heap_t *last_node, *parent;
 
-	if (!*root)
+	if (!root || !*root)
 		return (0);
 
-	/* max : value n of top node */
 	max = (*root)->n;
 
-	remove_top(*root);
+	/* Find the last inserted node */
+	last_node = get_last_node(*root);
+	if (!last_node)
+		return (0);
+
+	/* Swap last node value with root */
+	(*root)->n = last_node->n;
+
+	/* Remove last node from tree */
+	parent = last_node->parent;
+	if (parent)
+	{
+		if (parent->left == last_node)
+			parent->left = NULL;
+		else
+			parent->right = NULL;
+	}
+
+	free(last_node);
+
+	/* Heapify down */
+	heapify_down(*root);
+
 	return (max);
 }
 
 /**
- * remove_top - removes top node and reorganizes tree
- * @tree: pointer to current node
- * Return: void
+ * get_last_node - finds the last node in level order traversal
+ * @root: root of the heap
+ * Return: last node in the heap
  */
-void remove_top(heap_t *tree)
+heap_t *get_last_node(heap_t *root)
 {
-	heap_t *current_top;
+	/* Use a queue to perform level-order traversal */
+	heap_t *queue[1024];
+	int front = 0, rear = 0;
 
-	/* Base checks, end recursivity */
-	if (!tree->left)
+	if (!root)
+		return (NULL);
+
+	queue[rear++] = root;
+
+	while (front < rear)
+	{
+		root = queue[front++];
+		if (root->left)
+			queue[rear++] = root->left;
+		if (root->right)
+			queue[rear++] = root->right;
+	}
+
+	return (root);
+}
+
+/**
+ * heapify_down - restores max heap property by pushing the root down
+ * @tree: root of heap
+ */
+void heapify_down(heap_t *tree)
+{
+	heap_t *largest, *left, *right;
+	int temp;
+
+	if (!tree)
 		return;
 
-	current_top = tree->left;
-	if (tree->right && tree->right->n > tree->left->n)
-		current_top = tree->right;
-
-	tree->n = current_top->n;
-
-	if (current_top->left)
-		/* Proceed with recursivity until last left */
-		remove_top(current_top);
-	else
+	while (tree->left)
 	{
-		/* Node has a parent and current is parent left => end left with NULL */
-		/* Avoids duplicate node */
-		if (current_top->parent && current_top->parent->left == current_top)
-			current_top->parent->left = NULL;
+		left = tree->left;
+		right = tree->right;
+		largest = tree;
 
-		/* Node has a parent and current is parent right => end rigth with NULL */
-		/* Avoids duplicate node */
-		if (current_top->parent && current_top->parent->right == current_top)
-			current_top->parent->right = NULL;
-		free(current_top);
+		if (left && left->n > largest->n)
+			largest = left;
+		if (right && right->n > largest->n)
+			largest = right;
+
+		if (largest == tree)
+			break;
+
+		/* Swap values */
+		temp = tree->n;
+		tree->n = largest->n;
+		largest->n = temp;
+
+		/* Move down the tree */
+		tree = largest;
 	}
 }
 

@@ -1,6 +1,7 @@
 #include "binary_trees.h"
+#include <stdlib.h>
 
-/* Helper functions */
+/* Function Prototypes */
 heap_t *get_last_node(heap_t *root);
 void heapify_down(heap_t *tree);
 
@@ -52,13 +53,15 @@ int heap_extract(heap_t **root)
  */
 heap_t *get_last_node(heap_t *root)
 {
-	/* Use a queue to perform level-order traversal */
-	heap_t *queue[1024];
-	int front = 0, rear = 0;
-
 	if (!root)
 		return (NULL);
 
+	/* Use dynamically allocated queue */
+	heap_t **queue = malloc(1024 * sizeof(heap_t *));
+	if (!queue)
+		return (NULL);
+
+	int front = 0, rear = 0;
 	queue[rear++] = root;
 
 	while (front < rear)
@@ -70,6 +73,7 @@ heap_t *get_last_node(heap_t *root)
 			queue[rear++] = root->right;
 	}
 
+	free(queue);
 	return (root);
 }
 

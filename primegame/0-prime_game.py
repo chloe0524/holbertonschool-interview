@@ -1,15 +1,10 @@
 def isWinner(x, nums):
-    """
-    Determines the winner of each round of the Prime Game.
-    Maria and Ben take turns picking primes and removing them and their multiples.
-    Maria always goes first. Both play optimally.
-    Returns the name of the player who won the most rounds, or None if a tie.
-    """
+    """Determines the winner of each round of the Prime Game"""
     if x < 1 or not nums or len(nums) == 0:
         return None
 
     def sieve(n):
-        """Returns the number of primes <= n using Sieve of Eratosthenes."""
+        """Returns the number of primes <= n"""
         is_prime = [True] * (n + 1)
         is_prime[0:2] = [False, False]
         count = 0
@@ -47,4 +42,4 @@ def isWinner(x, nums):
     elif ben_wins > maria_wins:
         return "Ben"
     else:
-        return None 
+        return None

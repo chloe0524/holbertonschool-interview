@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 
-import sys
-import re
-from collections import defaultdict
-
-
 """
 prints total size + status codes seen so far
 every 10 lines + when user hits ctrl + c
 only lines that match the format are counted
 if status code not valid --> we just skip it
 """
+
+import sys
+import re
+from collections import defaultdict
+
 
 # Are those lines short enough for you now pycodestyle?
 # 'LiNe tOo lOnG (80 > 79 ChArS)' yeah right bye.

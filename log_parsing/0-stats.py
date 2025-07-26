@@ -6,6 +6,7 @@ only lines that match the format are counted
 if status code not valid --> we just skip it
 """
 
+
 import sys
 import re
 from collections import defaultdict

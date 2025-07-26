@@ -36,8 +36,6 @@ if __name__ == "__main__":
             r' '
             r'\[.*?\]'
             r' '
-            r'Chloe C '
-            r'"GET /projects/260 HTTP/1.1" '
             r'(\d{3}) '
             r'(\d+)$'
         )

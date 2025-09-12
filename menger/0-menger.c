@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <math.h>
+#include "menger.h"
 
 /**
  * is_empty - Recursively checks if a coordinate is in a "hole" of the sponge

@@ -52,7 +52,7 @@ def count_words(subreddit, wrd_list, after=None, wrd_cunt=None):
                 return
 
             sorted_wrds = sorted(filtered_cunts.items(),
-                                  key=lambda x: (-x[1], x[0]))
+                                 key=lambda x: (-x[1], x[0]))
             for wrd, cunt in sorted_wrds:
                 print(f"{wrd}: {cunt}")
 

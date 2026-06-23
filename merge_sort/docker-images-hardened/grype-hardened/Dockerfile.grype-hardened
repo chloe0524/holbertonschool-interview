@@ -1,0 +1,59 @@
+# Dockerfile durci -- image grype custom pour le job "sca"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+# Meme niveau de verification que syft : signature Cosign + checksum SHA256.
+
+FROM alpine:3.19 AS cosign-source
+ARG COSIGN_VERSION=2.4.1
+RUN apk add --no-cache curl
+RUN curl -L -o /usr/local/bin/cosign \
+        "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" && \
+    chmod +x /usr/local/bin/cosign
+
+FROM alpine:3.19 AS downloader
+
+RUN apk add --no-cache curl tar
+COPY --from=cosign-source /usr/local/bin/cosign /usr/local/bin/cosign
+
+WORKDIR /tmp
+
+ARG GRYPE_VERSION=0.114.0
+
+RUN curl -LO "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz" && \
+    curl -LO "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_checksums.txt" && \
+    curl -LO "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_checksums.txt.sig" && \
+    curl -LO "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_checksums.txt.pem"
+
+# [4.12] Verification de signature cryptographique (cosign keyless)
+RUN cosign verify-blob \
+        --certificate "grype_${GRYPE_VERSION}_checksums.txt.pem" \
+        --signature "grype_${GRYPE_VERSION}_checksums.txt.sig" \
+        --certificate-identity-regexp "https://github.com/anchore/grype/.github/workflows/release.yaml.*" \
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+        "grype_${GRYPE_VERSION}_checksums.txt"
+
+# [4.11] Verification d'integrite du binaire
+RUN grep "grype_${GRYPE_VERSION}_linux_amd64.tar.gz" "grype_${GRYPE_VERSION}_checksums.txt" | sha256sum -c -
+
+RUN tar -xzf "grype_${GRYPE_VERSION}_linux_amd64.tar.gz" grype
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S grype && adduser -S grype -G grype
+
+COPY --from=downloader --chown=grype:grype /tmp/grype /usr/local/bin/grype
+
+RUN chmod 755 /usr/local/bin/grype && \
+    find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER grype
+
+# Grype telecharge sa base de vulnerabilites au premier lancement
+# (grype.anchore.io) -- comportement reseau normal, pas un secret a gerer.
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/anchore/grype" \
+      version="0.114.0" \
+      description="Image grype durcie (CIS Docker Benchmark 4.1-4.12), binaire verifie par signature Cosign + checksum SHA256"
+
+ENTRYPOINT ["grype"]

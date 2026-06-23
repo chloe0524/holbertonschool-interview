@@ -1,0 +1,44 @@
+# Dockerfile durci -- image flake8 custom pour le job "lint"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+# Version confirmee : https://github.com/PyCQA/flake8/releases/tag/7.3.0
+
+# --- Etape 1 : installation des dependances Python ---
+# [4.2] Image de base officielle python (Docker Official Image)
+FROM python:3.12-alpine AS builder
+
+ARG FLAKE8_VERSION=7.3.0
+
+WORKDIR /build
+
+# [4.7] apk add et pip install combines, pas d'instruction de mise a jour isolee
+RUN apk add --no-cache gcc musl-dev && \
+    pip install --no-cache-dir --user "flake8==${FLAKE8_VERSION}"
+
+# --- Etape 2 : image finale minimale ---
+FROM python:3.12-alpine
+
+# [4.3] Pas de gcc/musl-dev dans l'image finale (necessaires uniquement
+# pour compiler d'eventuelles dependances C de flake8/ses plugins a l'etape 1)
+RUN addgroup -S flake8 && adduser -S flake8 -G flake8
+
+# [4.9] COPY plutot que ADD
+COPY --from=builder --chown=flake8:flake8 /root/.local /home/flake8/.local
+
+ENV PATH=/home/flake8/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
+
+# [4.8] Suppression setuid/setgid
+RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+# [4.1] Utilisateur non-root
+USER flake8
+
+# [4.10] Aucun secret -- ce job n'en necessite aucun
+# [4.6] HEALTHCHECK omis : outil CLI a usage unique, pas un service long-lived
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/PyCQA/flake8" \
+      version="7.3.0" \
+      description="Image flake8 durcie (CIS Docker Benchmark 4.1-4.12)"
+
+ENTRYPOINT ["flake8"]

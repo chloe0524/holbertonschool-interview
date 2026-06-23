@@ -1,0 +1,65 @@
+# Dockerfile durci -- image syft custom pour le job "sbom"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+#
+# Contrairement a gitleaks, Syft (Anchore) signe ses checksums.txt avec
+# Cosign en mode keyless (OIDC GitHub Actions) : on peut donc verifier une
+# vraie signature cryptographique, pas seulement un hash. C'est le niveau
+# de maturite supply-chain le plus eleve parmi les outils de cette pipeline
+# -- bon exemple a opposer a gitleaks/kics dans le rapport.
+
+# --- Etape 1 : Cosign, pour la verification de signature ---
+FROM alpine:3.19 AS cosign-source
+ARG COSIGN_VERSION=2.4.1
+RUN apk add --no-cache curl
+RUN curl -L -o /usr/local/bin/cosign \
+        "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" && \
+    chmod +x /usr/local/bin/cosign
+
+# --- Etape 2 : telechargement, verification de signature ET de checksum ---
+FROM alpine:3.19 AS downloader
+
+RUN apk add --no-cache curl tar
+COPY --from=cosign-source /usr/local/bin/cosign /usr/local/bin/cosign
+
+WORKDIR /tmp
+
+ARG SYFT_VERSION=1.45.1
+
+RUN curl -LO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz" && \
+    curl -LO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_checksums.txt" && \
+    curl -LO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_checksums.txt.sig" && \
+    curl -LO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_checksums.txt.pem"
+
+# [4.12] Verification de la signature cryptographique du fichier de checksums
+# (verification d'identite + signature, pas seulement de hash)
+RUN cosign verify-blob \
+        --certificate "syft_${SYFT_VERSION}_checksums.txt.pem" \
+        --signature "syft_${SYFT_VERSION}_checksums.txt.sig" \
+        --certificate-identity-regexp "https://github.com/anchore/syft/.github/workflows/release.yaml.*" \
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+        "syft_${SYFT_VERSION}_checksums.txt"
+
+# [4.11] Verification d'integrite du binaire une fois la signature confirmee
+RUN grep "syft_${SYFT_VERSION}_linux_amd64.tar.gz" "syft_${SYFT_VERSION}_checksums.txt" | sha256sum -c -
+
+RUN tar -xzf "syft_${SYFT_VERSION}_linux_amd64.tar.gz" syft
+
+# --- Etape 3 : image finale minimale ---
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S syft && adduser -S syft -G syft
+
+COPY --from=downloader --chown=syft:syft /tmp/syft /usr/local/bin/syft
+
+RUN chmod 755 /usr/local/bin/syft && \
+    find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER syft
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/anchore/syft" \
+      version="1.45.1" \
+      description="Image syft durcie (CIS Docker Benchmark 4.1-4.12), binaire verifie par signature Cosign + checksum SHA256"
+
+ENTRYPOINT ["syft"]

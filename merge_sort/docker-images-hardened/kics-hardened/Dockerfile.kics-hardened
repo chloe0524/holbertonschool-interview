@@ -1,0 +1,70 @@
+# Dockerfile durci -- image kics custom pour le job "iac"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+#
+# CORRECTION : contrairement a ce qui etait documente dans une version
+# precedente de ce fichier, KICS publie bien des garanties d'integrite
+# sur ses releases GitHub : checksums.txt + signature GPG
+# (checksums.txt.asc) + la cle publique de signature elle-meme
+# (kics-signing-key.asc). Verification reelle implementee ci-dessous,
+# plus forte que celle de gitleaks (qui n'a qu'un hash, pas de signature).
+#
+# RAPPEL SUPPLY-CHAIN : en mars-avril 2026, le groupe TeamPCP a compromis
+# kics-github-action (GitHub Action) et les images Docker Hub
+# checkmarx/kics (tags v2.1.20, alpine, latest, debian repointes vers un
+# binaire malveillant). Ce Dockerfile ne pull JAMAIS depuis Docker Hub --
+# le binaire vient exclusivement des releases GitHub taguees de
+# Checkmarx/kics (canal de publication distinct, non mentionne comme
+# compromis), et sa signature GPG est verifiee avant toute utilisation.
+
+FROM alpine:3.19 AS downloader
+
+RUN apk add --no-cache curl tar gnupg
+
+WORKDIR /tmp
+
+ARG KICS_VERSION=2.1.20
+
+RUN curl -LO "https://github.com/Checkmarx/kics/releases/download/v${KICS_VERSION}/kics_${KICS_VERSION}_linux_amd64.tar.gz" && \
+    curl -LO "https://github.com/Checkmarx/kics/releases/download/v${KICS_VERSION}/checksums.txt" && \
+    curl -LO "https://github.com/Checkmarx/kics/releases/download/v${KICS_VERSION}/checksums.txt.asc" && \
+    curl -LO "https://github.com/Checkmarx/kics/releases/download/v${KICS_VERSION}/kics-signing-key.asc"
+
+# [4.12] Verification de la signature GPG du fichier de checksums avant
+# de faire confiance a son contenu
+RUN gpg --import kics-signing-key.asc && \
+    gpg --verify checksums.txt.asc checksums.txt
+
+# [4.11] Verification d'integrite du binaire une fois la signature confirmee
+RUN grep "kics_${KICS_VERSION}_linux_amd64.tar.gz" checksums.txt | sha256sum -c -
+
+RUN tar -xzf "kics_${KICS_VERSION}_linux_amd64.tar.gz"
+
+# --- Image finale minimale ---
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates git && \
+    addgroup -S kics && adduser -S kics -G kics
+
+WORKDIR /app
+
+# kics a besoin du binaire. Le tarball de release GitHub ne contient PAS
+# de dossier assets/ separe (a la difference de l'image Docker officielle) :
+# les queries Rego par defaut sont embarquees directement dans le binaire
+# compile (go:embed). A verifier au premier scan -- si kics ne trouve pas
+# ses queries par defaut, il faudra fournir le dossier assets/queries
+# separement (clone du repo source a la meme version, ou -q explicite).
+COPY --from=downloader --chown=kics:kics /tmp/kics /app/kics
+
+ENV PATH=/app:$PATH
+
+RUN chmod 755 /app/kics && \
+    find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER kics
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/Checkmarx/kics" \
+      version="2.1.20" \
+      description="Image kics durcie (CIS Docker Benchmark 4.1-4.12). Binaire verifie par signature GPG + checksum SHA256, source depuis release GitHub taguee, jamais Docker Hub (cf. incident TeamPCP mars-avril 2026)."
+
+ENTRYPOINT ["kics"]

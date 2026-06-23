@@ -1,0 +1,51 @@
+# Dockerfile durci -- image scorecard (OpenSSF) custom pour le job "score"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+# Version confirmee : https://github.com/ossf/scorecard/releases/tag/v5.5.0
+#
+# NOTE DE TRANSPARENCE : je n'ai pas pu confirmer avec certitude la
+# presence d'un fichier checksums.txt signe (cosign/sigstore) sur cette
+# release precise au moment de la generation de ce fichier. Avant le
+# premier build, verifie manuellement les assets de la release :
+#   https://github.com/ossf/scorecard/releases/tag/v5.5.0
+# Si un fichier .sig/.pem/.sigstore.json accompagne un checksums.txt,
+# reprends le meme pattern de verification cosign que pour syft/grype
+# dans ce dossier plutot que la simple verification ci-dessous.
+
+FROM alpine:3.19 AS downloader
+
+RUN apk add --no-cache curl tar
+
+WORKDIR /tmp
+
+ARG SCORECARD_VERSION=5.5.0
+
+RUN curl -LO "https://github.com/ossf/scorecard/releases/download/v${SCORECARD_VERSION}/scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz"
+
+# Verification de checksum : a activer/adapter selon les assets reellement
+# presents sur cette release (voir note de transparence ci-dessus).
+# RUN curl -LO ".../scorecard_${SCORECARD_VERSION}_checksums.txt" && \
+#     grep "scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz" scorecard_${SCORECARD_VERSION}_checksums.txt | sha256sum -c -
+
+RUN tar -xzf "scorecard_${SCORECARD_VERSION}_linux_amd64.tar.gz" scorecard
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates git && \
+    addgroup -S scorecard && adduser -S scorecard -G scorecard
+
+COPY --from=downloader --chown=scorecard:scorecard /tmp/scorecard /usr/local/bin/scorecard
+
+RUN chmod 755 /usr/local/bin/scorecard && \
+    find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER scorecard
+
+# [4.10] GITHUB_AUTH_TOKEN necessaire au runtime (limites d'API GitHub),
+# passe via variable CI/CD masquee, jamais stocke dans ce Dockerfile.
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/ossf/scorecard" \
+      version="5.5.0" \
+      description="Image scorecard durcie (CIS Docker Benchmark 4.1-4.12) -- verification de checksum/signature a completer, voir note de transparence en tete de fichier"
+
+ENTRYPOINT ["scorecard"]

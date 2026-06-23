@@ -1,0 +1,45 @@
+# Dockerfile durci -- image sonar-scanner-cli custom pour le job "quality"
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+#
+# Approche differente des autres images de ce dossier : sonar-scanner-cli
+# necessite un JRE pour fonctionner (ce n'est pas un binaire Go statique).
+# Plutot que de deviner une URL de telechargement direct (que je n'ai pas
+# pu verifier avec certitude), ce Dockerfile extrait le scanner depuis
+# l'image officielle SonarSource (source de confiance, [4.2]) puis le
+# reconstruit dans une image finale minimale et non-root -- l'image
+# officielle sonarsource/sonar-scanner-cli tourne en root par defaut et
+# embarque davantage que le strict necessaire.
+#
+# A FIGER avant usage en CI : remplace le tag "latest" ci-dessous par une
+# version explicite (ex: 6.2) une fois verifiee, conformement au controle
+# CIS 4.2 (pas de tag flottant en production).
+
+ARG SONAR_SCANNER_SOURCE_TAG=latest
+FROM sonarsource/sonar-scanner-cli:${SONAR_SCANNER_SOURCE_TAG} AS source
+
+# --- Image finale minimale, JRE only (pas le JDK complet) ---
+FROM eclipse-temurin:21-jre-alpine
+
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S sonar && adduser -S sonar -G sonar
+
+WORKDIR /opt/sonar-scanner
+
+# Copie uniquement le scanner installe, pas les outils de l'image source
+COPY --from=source --chown=sonar:sonar /opt/sonar-scanner /opt/sonar-scanner
+
+ENV PATH=/opt/sonar-scanner/bin:$PATH \
+    SONAR_SCANNER_OPTS="-Djava.security.egd=file:/dev/./urandom"
+
+RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER sonar
+
+# [4.10] Aucun secret dans ce Dockerfile : SONAR_TOKEN et SONAR_HOST_URL
+# sont passes au runtime via les variables CI/CD Gitlab, jamais ici.
+
+LABEL maintainer="Chloe Correia" \
+      source="https://hub.docker.com/r/sonarsource/sonar-scanner-cli" \
+      description="Image sonar-scanner-cli durcie (CIS Docker Benchmark 4.1-4.12), JRE-only, non-root, reconstruite a partir de l'image officielle SonarSource"
+
+ENTRYPOINT ["sonar-scanner"]

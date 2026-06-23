@@ -1,0 +1,68 @@
+# Dockerfile durci -- image gitleaks custom, destinee a GitLab Container Registry
+# Conforme aux controles CIS Docker Benchmark v1.8.0, section 4
+# (Container Images and Build File Configuration), references entre crochets.
+
+# --- Etape 1 : telechargement et verification d'integrite ---
+# [4.2] Image de base officielle et de confiance (Alpine, depot officiel Docker Hub)
+FROM alpine:3.19 AS downloader
+
+# [4.7] apk add et utilisation combines dans la meme couche : pas d'instruction
+# de mise a jour isolee qui resterait en cache sans jamais etre rejouee.
+# [4.11] Les paquets Alpine sont verifies via la signature du depot apk (mecanisme natif).
+RUN apk add --no-cache curl tar
+
+WORKDIR /tmp
+
+ARG GITLEAKS_VERSION=8.30.1
+
+# [4.2] Source du binaire : releases officielles GitHub du projet gitleaks
+RUN curl -LO \
+        "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" && \
+    curl -LO \
+        "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+
+# [4.11] / [4.12] Verification d'integrite du binaire avant toute utilisation.
+# Limite assumee : gitleaks ne publie qu'un SHA256 (checksums.txt), pas de
+# signature cryptographique Cosign/GPG sur ses releases -- on ne peut donc
+# verifier que l'integrite, pas la provenance signee de l'artefact.
+RUN grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+
+RUN tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+
+# --- Etape 2 : image finale minimale ---
+# [4.2] Meme image de base de confiance pour l'etape finale
+FROM alpine:3.19
+
+# [4.3] Aucun paquet superflu : ca-certificates (TLS) et git sont les
+# seules dependances installees. git n'est pas "superflu" ici : c'est une
+# dependance fonctionnelle requise par gitleaks pour scanner l'historique
+# des commits (gitleaks detect sans --no-git appelle le binaire git).
+RUN apk add --no-cache ca-certificates git && \
+    addgroup -S gitleaks && adduser -S gitleaks -G gitleaks
+
+# [4.9] COPY utilise plutot que ADD (pas de recuperation distante ni
+# decompression automatique a ce stade -- deja fait et verifie en etape 1)
+COPY --from=downloader --chown=gitleaks:gitleaks /tmp/gitleaks /usr/local/bin/gitleaks
+
+RUN chmod 755 /usr/local/bin/gitleaks && \
+    # [4.8] Suppression des permissions setuid/setgid pour limiter
+    # l'escalade de privileges -- aucun binaire de ce projet n'en a besoin.
+    find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+# [4.1] Utilisateur non-root dedie, jamais root par defaut
+USER gitleaks
+
+# [4.10] Aucun secret stocke dans ce Dockerfile. Les eventuels secrets
+# necessaires au pipeline (token registre, etc.) passent par les variables
+# CI/CD masquees de GitLab, jamais par une instruction ARG/ENV ici.
+
+# [4.6] HEALTHCHECK volontairement omis : gitleaks est un outil CLI a usage
+# unique (scan puis sortie), pas un service de longue duree -- un health
+# check n'a pas de sens pour un conteneur qui ne reste pas en execution.
+
+LABEL maintainer="Chloe Correia" \
+      source="https://github.com/gitleaks/gitleaks" \
+      version="8.30.1" \
+      description="Image gitleaks durcie (CIS Docker Benchmark 4.1-4.12), binaire verifie par checksum SHA256"
+
+ENTRYPOINT ["gitleaks"]
